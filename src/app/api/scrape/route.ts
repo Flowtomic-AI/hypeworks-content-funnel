@@ -9,6 +9,48 @@ const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
+// ─── URL validation (SSRF guard) ─────────────────────────────────────────────
+
+function validateUrl(urlString: string): { valid: boolean; error?: string } {
+  let parsed: URL
+  try {
+    parsed = new URL(urlString)
+  } catch {
+    return { valid: false, error: 'Invalid URL format' }
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return { valid: false, error: 'Only HTTP/HTTPS URLs are allowed' }
+  }
+
+  const hostname = parsed.hostname.toLowerCase()
+
+  // Block loopback and localhost
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+    return { valid: false, error: 'URL resolves to a private network address' }
+  }
+
+  // Block cloud metadata endpoints (AWS, GCP, Azure)
+  if (
+    hostname === '169.254.169.254' ||
+    hostname === 'metadata.google.internal' ||
+    hostname === '168.63.129.16'
+  ) {
+    return { valid: false, error: 'URL resolves to a private network address' }
+  }
+
+  // Block RFC-1918 private ranges
+  if (
+    /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+    /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)
+  ) {
+    return { valid: false, error: 'URL resolves to a private network address' }
+  }
+
+  return { valid: true }
+}
+
 // ─── Shared result type ──────────────────────────────────────────────────────
 
 interface ScrapeResult {
@@ -382,8 +424,9 @@ function extractAsin(url: string): string | null {
 
 async function scrapeReviews(asin: string): Promise<string[]> {
   if (!ANTHROPIC_API_KEY) return []
-  // Need at least one scraper available for reviews
-  if (!CLOUDFLARE_ACCOUNT_ID && !CLOUDFLARE_API_TOKEN && !FIRECRAWL_API_KEY) return []
+  // Need at least one capable scraper available for reviews (basic fetch can't handle Amazon)
+  const cloudflareReady = !!(CLOUDFLARE_ACCOUNT_ID && CLOUDFLARE_API_TOKEN)
+  if (!cloudflareReady && !FIRECRAWL_API_KEY) return []
 
   try {
     const reviewUrl = `https://www.amazon.com/product-reviews/${asin}?sortBy=recent&pageNumber=1`
@@ -440,6 +483,11 @@ export async function POST(request: Request) {
 
   if (!url) {
     return NextResponse.json({ error: 'URL is required' }, { status: 400 })
+  }
+
+  const urlValidation = validateUrl(url)
+  if (!urlValidation.valid) {
+    return NextResponse.json({ error: urlValidation.error ?? 'Invalid URL' }, { status: 400 })
   }
 
   try {
