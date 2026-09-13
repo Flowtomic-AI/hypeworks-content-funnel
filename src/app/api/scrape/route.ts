@@ -423,6 +423,44 @@ ${result.markdown.substring(0, 8000)}`,
   }
 }
 
+// ─── URL safety guard (SSRF prevention) ─────────────────────────────────────
+
+function isSafeUrl(rawUrl: string): boolean {
+  let url: URL
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
+
+  const host = url.hostname.toLowerCase()
+  if (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal')
+  ) return false
+
+  // Block private IPv4 ranges and cloud metadata endpoint
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (ipv4) {
+    const [a, b] = ipv4.slice(1).map(Number)
+    if (
+      a === 10 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      a === 0 ||
+      a >= 224
+    ) return false
+  }
+
+  return true
+}
+
 // ─── Main handler ───────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
@@ -440,6 +478,10 @@ export async function POST(request: Request) {
 
   if (!url) {
     return NextResponse.json({ error: 'URL is required' }, { status: 400 })
+  }
+
+  if (!isSafeUrl(url)) {
+    return NextResponse.json({ error: 'Invalid or disallowed URL' }, { status: 400 })
   }
 
   try {
