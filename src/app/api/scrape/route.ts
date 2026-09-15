@@ -442,6 +442,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'URL is required' }, { status: 400 })
   }
 
+  // Block SSRF: only allow public HTTP/HTTPS URLs
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+    }
+    const hostname = parsed.hostname.toLowerCase()
+    // Block localhost and private IP ranges (IPv4 + IPv6)
+    const blocked =
+      /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.0\.0\.0|::1|fc00:|fd)/.test(hostname) ||
+      hostname === '169.254.169.254' // AWS/GCP metadata endpoint
+    if (blocked) {
+      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+    }
+  } catch {
+    return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+  }
+
   try {
     let method: 'ai' | 'regex' = 'regex'
 
