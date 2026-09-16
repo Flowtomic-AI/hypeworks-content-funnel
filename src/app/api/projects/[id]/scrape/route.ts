@@ -23,6 +23,22 @@ export async function POST(
   }
 
   try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+    }
+    const hostname = parsed.hostname.toLowerCase()
+    const blocked =
+      /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|0\.0\.0\.0|::1|fc00:|fd)/.test(hostname) ||
+      hostname === '169.254.169.254'
+    if (blocked) {
+      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+    }
+  } catch {
+    return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+  }
+
+  try {
     const response = await fetch(url, {
       headers: {
         'User-Agent':
