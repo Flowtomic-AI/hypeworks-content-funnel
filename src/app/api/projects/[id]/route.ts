@@ -45,9 +45,27 @@ export async function PUT(
 
   const body = await request.json()
 
+  const allowed = {
+    name: body.name,
+    product_name: body.product_name,
+    brand_name: body.brand_name,
+    description: body.description,
+    key_features: body.key_features,
+    target_audience: body.target_audience,
+    category: body.category,
+    content_tone: body.content_tone,
+    brand_colors: body.brand_colors,
+    source_urls: body.source_urls,
+    scraped_data: body.scraped_data,
+    status: body.status,
+  }
+  const updatePayload = Object.fromEntries(
+    Object.entries(allowed).filter(([, v]) => v !== undefined)
+  )
+
   const { data, error } = await supabase
     .from('projects')
-    .update(body)
+    .update(updatePayload)
     .eq('id', id)
     .eq('user_id', user.id)
     .select()

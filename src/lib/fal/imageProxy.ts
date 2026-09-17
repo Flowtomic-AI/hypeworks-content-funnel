@@ -1,7 +1,18 @@
 import { fal } from '@fal-ai/client'
 
-// In-process URL cache: avoid re-uploading the same source image within a request batch
+// In-process URL cache: avoid re-uploading the same source image within a request batch.
+// Capped at 200 entries to prevent unbounded growth in long-lived serverless instances.
+const MAX_CACHE_SIZE = 200
 const proxyCache = new Map<string, string>()
+
+function cacheSet(key: string, value: string): void {
+  if (proxyCache.size >= MAX_CACHE_SIZE) {
+    // Evict oldest entry (Map iteration order is insertion order)
+    const firstKey = proxyCache.keys().next().value
+    if (firstKey !== undefined) proxyCache.delete(firstKey)
+  }
+  proxyCache.set(key, value)
+}
 
 /**
  * Proxies an external image URL through fal.ai storage.
@@ -60,6 +71,6 @@ export async function proxyImageToFalStorage(sourceUrl: string): Promise<string>
   // Upload to fal.ai storage — returns a stable fal CDN URL
   const falUrl = await fal.storage.upload(blob)
 
-  proxyCache.set(sourceUrl, falUrl)
+  cacheSet(sourceUrl, falUrl)
   return falUrl
 }
