@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { isSafeUrl } from '@/lib/isSafeUrl'
 
 export const maxDuration = 60
 
@@ -440,6 +441,10 @@ export async function POST(request: Request) {
 
   if (!url) {
     return NextResponse.json({ error: 'URL is required' }, { status: 400 })
+  }
+
+  if (!isSafeUrl(url)) {
+    return NextResponse.json({ error: 'Invalid or disallowed URL' }, { status: 400 })
   }
 
   try {
