@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSafeUrl } from '@/lib/isSafeUrl'
 
 export async function POST(
   request: Request,
@@ -20,6 +21,10 @@ export async function POST(
 
   if (!url) {
     return NextResponse.json({ error: 'URL is required' }, { status: 400 })
+  }
+
+  if (!isSafeUrl(url)) {
+    return NextResponse.json({ error: 'Invalid or disallowed URL' }, { status: 400 })
   }
 
   try {
