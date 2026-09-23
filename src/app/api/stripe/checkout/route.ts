@@ -13,11 +13,18 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const priceId: string | undefined = body.priceId
+  const tier: string | undefined = body.priceId
 
-  if (!priceId) {
+  const ALLOWED_TIERS: Record<string, string | undefined> = {
+    pro: process.env.STRIPE_PRO_PRICE_ID,
+    agency: process.env.STRIPE_AGENCY_PRICE_ID,
+  }
+
+  const resolvedPriceId = tier ? ALLOWED_TIERS[tier] : undefined
+
+  if (!resolvedPriceId) {
     return NextResponse.json(
-      { error: 'priceId is required' },
+      { error: 'Invalid plan' },
       { status: 400 }
     )
   }
@@ -46,7 +53,7 @@ export async function POST(request: Request) {
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [{ price: resolvedPriceId, quantity: 1 }],
     mode: 'subscription',
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?checkout=success`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?checkout=canceled`,
