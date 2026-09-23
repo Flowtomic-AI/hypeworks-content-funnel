@@ -36,17 +36,18 @@ function buildSlotRequests(
   // Slot IDs specified
   if (Array.isArray(body.slotIds) && body.slotIds.length > 0) {
     const slotIds = body.slotIds as SlotId[]
-    return slotIds.map((id) => {
-      const def = SLOT_DEFINITIONS.find((s) => s.id === id)!
+    return slotIds.flatMap((id) => {
+      const def = SLOT_DEFINITIONS.find((s) => s.id === id)
+      if (!def) return []
       const strategy = analysis?.slot_strategy?.find((s) => s.slot_id === id)
-      return {
+      return [{
         slotId: id,
         format: def.format,
         intent: def.intent,
         headline: strategy?.headline,
         subheadline: strategy?.subheadline,
         copyBrief: strategy?.copy_brief ?? def.defaultBrief,
-      }
+      }]
     })
   }
 
@@ -166,15 +167,29 @@ export async function POST(
     const slots = buildSlotRequests(body, analysis)
     const slotCount = slots.length
 
-    if (
-      !isAdmin &&
-      profile.subscription_tier === 'free' &&
-      profile.credits_remaining < slotCount
-    ) {
-      return NextResponse.json(
-        { error: 'Insufficient credits. Upgrade your plan to continue.' },
-        { status: 403 }
-      )
+    if (!isAdmin && profile.subscription_tier === 'free') {
+      if (profile.credits_remaining < slotCount) {
+        return NextResponse.json(
+          { error: 'Insufficient credits. Upgrade your plan to continue.' },
+          { status: 403 }
+        )
+      }
+      // Atomically deduct credits before generation; the conditional eq() acts as an
+      // optimistic lock so two concurrent requests cannot both pass the check above
+      // and then each decrement from the same snapshot value.
+      const { data: deducted } = await admin
+        .from('profiles')
+        .update({ credits_remaining: profile.credits_remaining - slotCount })
+        .eq('id', user.id)
+        .eq('credits_remaining', profile.credits_remaining)
+        .select('id')
+
+      if (!deducted?.length) {
+        return NextResponse.json(
+          { error: 'Insufficient credits. Upgrade your plan to continue.' },
+          { status: 403 }
+        )
+      }
     }
 
     await supabase
@@ -351,13 +366,14 @@ export async function POST(
     )
 
     const successCount = results.filter((r) => r.status === 'complete').length
+    const failedCount = slotCount - successCount
 
-    if (!isAdmin && profile.subscription_tier === 'free' && successCount > 0) {
+    // Credits were pre-deducted for all slotCount slots. Settle to only charge for
+    // successfully generated images (profile.credits_remaining is the pre-request snapshot).
+    if (!isAdmin && profile.subscription_tier === 'free' && failedCount > 0) {
       await admin
         .from('profiles')
-        .update({
-          credits_remaining: Math.max(0, profile.credits_remaining - successCount),
-        })
+        .update({ credits_remaining: profile.credits_remaining - successCount })
         .eq('id', user.id)
     }
 
