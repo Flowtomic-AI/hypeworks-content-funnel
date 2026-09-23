@@ -1,4 +1,7 @@
 import { fal } from '@fal-ai/client'
+import { isSafeUrl } from '@/lib/isSafeUrl'
+
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024 // 20 MB
 
 // In-process URL cache: avoid re-uploading the same source image within a request batch.
 // Capped at 200 entries to prevent unbounded growth in long-lived serverless instances.
@@ -36,6 +39,10 @@ export async function proxyImageToFalStorage(sourceUrl: string): Promise<string>
     return sourceUrl
   }
 
+  if (!isSafeUrl(sourceUrl)) {
+    throw new Error(`Blocked unsafe image URL: ${sourceUrl}`)
+  }
+
   // Return cached result to avoid duplicate uploads in the same generation batch
   const cached = proxyCache.get(sourceUrl)
   if (cached) return cached
@@ -48,6 +55,8 @@ export async function proxyImageToFalStorage(sourceUrl: string): Promise<string>
       Accept: 'image/webp,image/apng,image/*,*/*;q=0.8',
       Referer: 'https://www.amazon.com/',
     },
+    redirect: 'error',
+    signal: AbortSignal.timeout(15_000),
   })
 
   if (!response.ok) {
@@ -65,7 +74,15 @@ export async function proxyImageToFalStorage(sourceUrl: string): Promise<string>
     )
   }
 
+  const contentLength = response.headers.get('content-length')
+  if (contentLength && parseInt(contentLength, 10) > MAX_IMAGE_BYTES) {
+    throw new Error(`Image too large (${contentLength} bytes) from ${sourceUrl}`)
+  }
+
   const buffer = await response.arrayBuffer()
+  if (buffer.byteLength > MAX_IMAGE_BYTES) {
+    throw new Error(`Image too large (${buffer.byteLength} bytes) from ${sourceUrl}`)
+  }
   const blob = new Blob([buffer], { type: contentType })
 
   // Upload to fal.ai storage — returns a stable fal CDN URL

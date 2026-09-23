@@ -48,7 +48,11 @@ export async function POST(request: Request) {
         const priceId = sub.items.data[0]?.price?.id
 
         const tier =
-          priceId === process.env.STRIPE_AGENCY_PRICE_ID ? 'agency' : 'pro'
+          priceId === process.env.STRIPE_AGENCY_PRICE_ID
+            ? 'agency'
+            : priceId === process.env.STRIPE_PRO_PRICE_ID
+              ? 'pro'
+              : 'free'
 
         await supabase.from('subscriptions').upsert(
           {
@@ -93,7 +97,11 @@ export async function POST(request: Request) {
 
       const priceId = sub.items.data[0]?.price?.id
       const tier =
-        priceId === process.env.STRIPE_AGENCY_PRICE_ID ? 'agency' : 'pro'
+        priceId === process.env.STRIPE_AGENCY_PRICE_ID
+          ? 'agency'
+          : priceId === process.env.STRIPE_PRO_PRICE_ID
+            ? 'pro'
+            : 'free'
 
       await supabase
         .from('subscriptions')

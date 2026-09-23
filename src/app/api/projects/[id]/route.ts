@@ -23,7 +23,8 @@ export async function GET(
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 404 })
+    console.error('[GET /api/projects/[id]] Supabase error:', error.message)
+    return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
 
   return NextResponse.json(data)
@@ -44,6 +45,11 @@ export async function PUT(
   }
 
   const body = await request.json()
+
+  const VALID_STATUSES = new Set(['draft', 'generating', 'complete', 'failed'])
+  if (body.status !== undefined && !VALID_STATUSES.has(body.status)) {
+    return NextResponse.json({ error: 'Invalid status value' }, { status: 400 })
+  }
 
   const allowed = {
     name: body.name,
@@ -72,7 +78,8 @@ export async function PUT(
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[PUT /api/projects/[id]] Supabase error:', error.message)
+    return NextResponse.json({ error: 'Failed to update project' }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -99,7 +106,8 @@ export async function DELETE(
     .eq('user_id', user.id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[DELETE /api/projects/[id]] Supabase error:', error.message)
+    return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 })
   }
 
   return new NextResponse(null, { status: 204 })

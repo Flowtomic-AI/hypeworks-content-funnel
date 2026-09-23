@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSafeUrl } from '@/lib/isSafeUrl'
 
 export async function GET() {
   const supabase = await createClient()
@@ -18,7 +19,8 @@ export async function GET() {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[GET /api/user/profile] Supabase error:', error.message)
+    return NextResponse.json({ error: 'Failed to load profile' }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -36,6 +38,12 @@ export async function PUT(request: Request) {
 
   const body = await request.json()
 
+  if (body.avatar_url !== undefined) {
+    if (typeof body.avatar_url !== 'string' || !isSafeUrl(body.avatar_url)) {
+      return NextResponse.json({ error: 'Invalid avatar_url' }, { status: 400 })
+    }
+  }
+
   const allowedFields = ['full_name', 'avatar_url']
   const updates: Record<string, unknown> = {}
   for (const field of allowedFields) {
@@ -50,7 +58,8 @@ export async function PUT(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[PUT /api/user/profile] Supabase error:', error.message)
+    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
   }
 
   return NextResponse.json(data)

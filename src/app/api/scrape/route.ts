@@ -150,7 +150,10 @@ async function scrapeWithFetch(url: string): Promise<string | null> {
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
-      redirect: 'follow',
+      // 'error' prevents open-redirect SSRF: an attacker-controlled public URL
+      // could 301 to an internal address after passing isSafeUrl validation.
+      redirect: 'error',
+      signal: AbortSignal.timeout(15_000),
     })
 
     if (!res.ok) return null

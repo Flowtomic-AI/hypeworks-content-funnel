@@ -18,7 +18,8 @@ export async function GET() {
     .order('created_at', { ascending: false })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[GET /api/projects] Supabase error:', error.message)
+    return NextResponse.json({ error: 'Failed to load projects' }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -56,7 +57,8 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[POST /api/projects] Supabase error:', error.message)
+    return NextResponse.json({ error: 'Failed to create project' }, { status: 500 })
   }
 
   return NextResponse.json(data, { status: 201 })
