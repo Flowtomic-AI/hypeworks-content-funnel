@@ -140,24 +140,46 @@ async function fetchPageContent(url: string): Promise<ScrapeResult> {
 }
 
 // ─── Basic fetch fallback (raw HTML) ────────────────────────────────────────
+//
+// Uses manual redirect handling to prevent SSRF bypass via open redirects:
+// each hop is re-validated with isSafeUrl before following.
+
+const FETCH_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+}
 
 async function scrapeWithFetch(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      redirect: 'follow',
-    })
+  const MAX_REDIRECTS = 5
+  let currentUrl = url
 
-    if (!res.ok) return null
-    return res.text()
-  } catch {
-    return null
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    try {
+      const res = await fetch(currentUrl, {
+        headers: FETCH_HEADERS,
+        redirect: 'manual',
+      })
+
+      // Follow redirects only after re-validating the target URL
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location')
+        if (!location) return null
+        const next = new URL(location, currentUrl).toString()
+        if (!isSafeUrl(next)) return null
+        currentUrl = next
+        continue
+      }
+
+      if (!res.ok) return null
+      return res.text()
+    } catch {
+      return null
+    }
   }
+
+  return null
 }
 
 // ─── Claude: extract structured product data from page content ──────────────

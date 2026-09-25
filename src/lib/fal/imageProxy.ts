@@ -1,4 +1,5 @@
 import { fal } from '@fal-ai/client'
+import { isSafeUrl } from '@/lib/isSafeUrl'
 
 // In-process URL cache: avoid re-uploading the same source image within a request batch.
 // Capped at 200 entries to prevent unbounded growth in long-lived serverless instances.
@@ -34,6 +35,11 @@ export async function proxyImageToFalStorage(sourceUrl: string): Promise<string>
     sourceUrl.startsWith('https://fal.media/')
   ) {
     return sourceUrl
+  }
+
+  // SSRF guard: reject private/internal URLs before fetching
+  if (!isSafeUrl(sourceUrl)) {
+    throw new Error(`Blocked image URL (private/internal host): ${sourceUrl}`)
   }
 
   // Return cached result to avoid duplicate uploads in the same generation batch
