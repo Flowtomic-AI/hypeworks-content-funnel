@@ -13,12 +13,26 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const priceId: string | undefined = body.priceId
+  const tier: string | undefined = body.priceId
 
+  // Map tier names to actual Stripe price IDs server-side — never accept raw price IDs from the client
+  const TIER_TO_PRICE: Record<string, string | undefined> = {
+    pro: process.env.STRIPE_PRO_PRICE_ID,
+    agency: process.env.STRIPE_AGENCY_PRICE_ID,
+  }
+
+  if (!tier || !(tier in TIER_TO_PRICE)) {
+    return NextResponse.json(
+      { error: 'Invalid plan' },
+      { status: 400 }
+    )
+  }
+
+  const priceId = TIER_TO_PRICE[tier]
   if (!priceId) {
     return NextResponse.json(
-      { error: 'priceId is required' },
-      { status: 400 }
+      { error: 'Plan not configured' },
+      { status: 500 }
     )
   }
 
