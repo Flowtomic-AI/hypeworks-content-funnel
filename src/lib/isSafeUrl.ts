@@ -29,8 +29,9 @@ export function isSafeUrl(rawUrl: string): boolean {
   // IPv4 dotted-decimal
   const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
   if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])]
-    return isSafeIPv4(a, b)
+    const octets = [Number(ipv4[1]), Number(ipv4[2]), Number(ipv4[3]), Number(ipv4[4])]
+    if (octets.some((o) => o > 255)) return false
+    return isSafeIPv4(octets[0], octets[1])
   }
 
   return true
