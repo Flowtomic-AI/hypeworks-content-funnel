@@ -24,18 +24,20 @@ interface SlotRequest {
 
 // ─── Build slot requests from body ──────────────────────────────────────────
 
+const MAX_SLOTS = 16
+
 function buildSlotRequests(
   body: Record<string, unknown>,
   analysis: StrategyAnalysis | null
 ): SlotRequest[] {
   // New API: explicit slots array
   if (Array.isArray(body.slots) && body.slots.length > 0) {
-    return body.slots as SlotRequest[]
+    return (body.slots as SlotRequest[]).slice(0, MAX_SLOTS)
   }
 
   // Slot IDs specified
   if (Array.isArray(body.slotIds) && body.slotIds.length > 0) {
-    const slotIds = body.slotIds as SlotId[]
+    const slotIds = (body.slotIds as SlotId[]).slice(0, MAX_SLOTS)
     return slotIds.map((id) => {
       const def = SLOT_DEFINITIONS.find((s) => s.id === id)!
       const strategy = analysis?.slot_strategy?.find((s) => s.slot_id === id)
@@ -52,7 +54,7 @@ function buildSlotRequests(
 
   // Legacy: formats array — map to default slots
   if (Array.isArray(body.formats) && body.formats.length > 0) {
-    const formats = body.formats as ImageFormatType[]
+    const formats = (body.formats as ImageFormatType[]).slice(0, MAX_SLOTS)
     return formats.map((format) => {
       const def = SLOT_DEFINITIONS.find((s) => s.format === format) ?? SLOT_DEFINITIONS[0]
       const strategy = analysis?.slot_strategy?.find((s) => s.slot_id === def.id)
