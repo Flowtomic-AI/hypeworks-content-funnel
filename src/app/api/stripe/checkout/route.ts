@@ -15,9 +15,14 @@ export async function POST(request: Request) {
   const body = await request.json()
   const priceId: string | undefined = body.priceId
 
-  if (!priceId) {
+  const allowedPriceIds = [
+    process.env.STRIPE_PRO_PRICE_ID,
+    process.env.STRIPE_AGENCY_PRICE_ID,
+  ].filter(Boolean) as string[]
+
+  if (!priceId || !allowedPriceIds.includes(priceId)) {
     return NextResponse.json(
-      { error: 'priceId is required' },
+      { error: 'Invalid priceId' },
       { status: 400 }
     )
   }
