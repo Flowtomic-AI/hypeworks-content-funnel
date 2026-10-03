@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { SLOT_DEFINITIONS } from '@/lib/templates/types'
+import { isSafeUrl } from '@/lib/isSafeUrl'
 
 export const maxDuration = 120
 
@@ -249,7 +250,8 @@ export async function POST(
 
   const scraped = project.scraped_data as Record<string, unknown> | null
   const reviews = (scraped?.product_reviews as string[]) ?? []
-  const imageUrls = (scraped?.product_images as string[]) ?? []
+  // Filter to safe URLs — scraped_data is user-writable so any URL could be present
+  const imageUrls = ((scraped?.product_images as string[]) ?? []).filter(isSafeUrl)
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
