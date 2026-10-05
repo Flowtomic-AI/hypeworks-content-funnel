@@ -13,9 +13,10 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('projects')
-    .select('*')
+    .select('id,name,product_name,brand_name,description,category,status,created_at,updated_at,key_features,target_audience,content_tone,brand_colors,source_urls')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+    .limit(200)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

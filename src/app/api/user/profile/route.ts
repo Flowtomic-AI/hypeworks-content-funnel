@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id,full_name,avatar_url,subscription_tier,subscription_status,credits_remaining,created_at,updated_at')
     .eq('id', user.id)
     .single()
 

@@ -45,6 +45,7 @@ export async function PUT(
 
   const body = await request.json()
 
+  const VALID_STATUSES = new Set(['draft', 'scraping', 'analyzing', 'generating', 'complete', 'failed'])
   const allowed = {
     name: body.name,
     product_name: body.product_name,
@@ -56,8 +57,8 @@ export async function PUT(
     content_tone: body.content_tone,
     brand_colors: body.brand_colors,
     source_urls: body.source_urls,
-    scraped_data: body.scraped_data,
-    status: body.status,
+    // scraped_data excluded: only server-side scrape operations may write it
+    status: typeof body.status === 'string' && VALID_STATUSES.has(body.status) ? body.status : undefined,
   }
   const updatePayload = Object.fromEntries(
     Object.entries(allowed).filter(([, v]) => v !== undefined)

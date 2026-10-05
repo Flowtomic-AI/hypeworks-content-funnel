@@ -10,6 +10,7 @@ import { SLOT_DEFINITIONS, type SlotId } from '@/lib/templates/types'
 import type { ImageIntent } from '@/lib/templates/types'
 import { IMAGE_FORMATS, type ImageFormatType } from '@/types'
 import type { StrategyAnalysis, SlotStrategy } from '../analyze/route'
+import { isSafeUrl } from '@/lib/isSafeUrl'
 
 // ─── Slot request type ───────────────────────────────────────────────────────
 
@@ -152,15 +153,12 @@ export async function POST(
 
     // Proxy all product images to fal.ai storage upfront (in-process cache makes repeated calls free).
     // We rotate images across slots so each gets a different product photo for visual variety.
-    const proxiedProductImages: string[] = []
-    for (const img of productImages.slice(0, 5)) {
-      try {
-        const proxied = await proxyImageToFalStorage(img)
-        proxiedProductImages.push(proxied)
-      } catch {
-        // skip failed proxies
-      }
-    }
+    // Only proxy URLs that pass the SSRF guard to prevent server-side fetch of internal endpoints.
+    const safeProductImages = productImages.slice(0, 5).filter(isSafeUrl)
+    const proxyResults = await Promise.allSettled(safeProductImages.map(proxyImageToFalStorage))
+    const proxiedProductImages = proxyResults
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+      .map((r) => r.value)
     const proxiedProductImageUrl = proxiedProductImages[0] ?? undefined
 
     const slots = buildSlotRequests(body, analysis)
@@ -181,6 +179,7 @@ export async function POST(
       .from('projects')
       .update({ status: 'generating' })
       .eq('id', projectId)
+      .eq('user_id', user.id)
 
     // ── Run all slots in parallel ───────────────────────────────────────────
     const settled = await Promise.allSettled(
@@ -282,7 +281,10 @@ export async function POST(
           .from('generated-images')
           .upload(storagePath, finalPng, { contentType: 'image/png' })
 
-        if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`)
+        if (uploadError) {
+          console.error(`Storage upload failed for slot ${slot.slotId}:`, uploadError.message)
+          throw new Error('Storage upload failed')
+        }
 
         const { data: { publicUrl } } = admin.storage
           .from('generated-images')
@@ -311,7 +313,10 @@ export async function POST(
             status: 'complete',
           })
 
-        if (insertError) throw new Error(`DB insert failed: ${insertError.message}`)
+        if (insertError) {
+          console.error(`DB insert failed for slot ${slot.slotId}:`, insertError.message)
+          throw new Error('Failed to save generated image')
+        }
 
         return {
           slotId: slot.slotId,
@@ -365,6 +370,7 @@ export async function POST(
       .from('projects')
       .update({ status: 'complete' })
       .eq('id', projectId)
+      .eq('user_id', user.id)
 
     if (results.every((r) => r.status === 'failed')) {
       const firstError = results[0]?.error ?? 'All slots failed to generate'

@@ -22,6 +22,15 @@ export async function POST(request: Request) {
     )
   }
 
+  const validPriceIds = [
+    process.env.STRIPE_PRO_PRICE_ID,
+    process.env.STRIPE_AGENCY_PRICE_ID,
+  ].filter(Boolean)
+
+  if (!validPriceIds.includes(priceId)) {
+    return NextResponse.json({ error: 'Invalid priceId' }, { status: 400 })
+  }
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('stripe_customer_id')
