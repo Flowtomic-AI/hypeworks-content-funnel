@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { isSafeUrl } from '@/lib/isSafeUrl'
+import { isSafeUrl, safeFetch } from '@/lib/isSafeUrl'
 
 export async function POST(
   request: Request,
@@ -28,7 +28,7 @@ export async function POST(
   }
 
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
