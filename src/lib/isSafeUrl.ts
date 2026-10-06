@@ -72,3 +72,32 @@ function isSafeIPv6(host: string): boolean {
 
   return true
 }
+
+/**
+ * Like fetch(), but checks every redirect target with isSafeUrl before following.
+ * Prevents SSRF via open redirects (e.g. public.com → 169.254.169.254).
+ * Follows at most maxRedirects hops; throws on an unsafe redirect destination.
+ */
+export async function safeFetch(
+  url: string,
+  init: RequestInit = {},
+  maxRedirects = 5
+): Promise<Response> {
+  let current = url
+  for (let i = 0; i <= maxRedirects; i++) {
+    const res = await fetch(current, { ...init, redirect: 'manual' })
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location')
+      if (!location) throw new Error('Redirect with no Location header')
+      // Resolve relative redirects against the current URL
+      const next = new URL(location, current).toString()
+      if (!isSafeUrl(next)) {
+        throw new Error(`Redirect to disallowed URL blocked: ${next}`)
+      }
+      current = next
+      continue
+    }
+    return res
+  }
+  throw new Error('Too many redirects')
+}
