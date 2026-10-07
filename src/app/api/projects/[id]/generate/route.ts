@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/admin'
 import { generateBackground } from '@/lib/fal/generate'
 import { generateOptimizedPrompt } from '@/lib/fal/prompt'
 import { proxyImageToFalStorage } from '@/lib/fal/imageProxy'
+import { isSafeUrl } from '@/lib/isSafeUrl'
 import { renderTemplate } from '@/lib/templates'
 import type { TemplateData } from '@/lib/templates'
 import { SLOT_DEFINITIONS, type SlotId } from '@/lib/templates/types'
@@ -154,6 +155,7 @@ export async function POST(
     // We rotate images across slots so each gets a different product photo for visual variety.
     const proxiedProductImages: string[] = []
     for (const img of productImages.slice(0, 5)) {
+      if (!isSafeUrl(img)) continue
       try {
         const proxied = await proxyImageToFalStorage(img)
         proxiedProductImages.push(proxied)
