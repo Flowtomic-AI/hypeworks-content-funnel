@@ -2,9 +2,9 @@
  * SSRF guard: returns true only for public, routable URLs.
  *
  * Blocks non-http/https schemes, private IPv4 ranges (RFC 1918, loopback,
- * link-local 169.254), multicast, all IPv6 private/loopback/link-local/ULA
- * ranges, IPv4-mapped IPv6 addresses that resolve to private IPs, and
- * special hostnames (localhost, *.local, *.internal).
+ * link-local 169.254, CGNAT 100.64.0.0/10), multicast, all IPv6
+ * private/loopback/link-local/ULA ranges, IPv4-mapped IPv6 addresses that
+ * resolve to private IPs, and special hostnames (localhost, *.local, *.internal).
  */
 export function isSafeUrl(rawUrl: string): boolean {
   let url: URL
@@ -41,6 +41,7 @@ function isSafeIPv4(a: number, b: number): boolean {
   if (a === 10) return false              // 10.0.0.0/8
   if (a === 127) return false             // 127.0.0.0/8 (loopback)
   if (a === 169 && b === 254) return false // 169.254.0.0/16 (link-local / metadata)
+  if (a === 100 && b >= 64 && b <= 127) return false  // 100.64.0.0/10 (CGNAT, RFC 6598)
   if (a === 172 && b >= 16 && b <= 31) return false // 172.16.0.0/12
   if (a === 192 && b === 168) return false // 192.168.0.0/16
   if (a >= 224) return false              // 224+ (multicast, reserved)
