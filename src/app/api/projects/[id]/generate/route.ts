@@ -28,16 +28,19 @@ function buildSlotRequests(
   body: Record<string, unknown>,
   analysis: StrategyAnalysis | null
 ): SlotRequest[] {
+  const MAX_SLOTS = SLOT_DEFINITIONS.length
+
   // New API: explicit slots array
   if (Array.isArray(body.slots) && body.slots.length > 0) {
-    return body.slots as SlotRequest[]
+    return (body.slots as SlotRequest[]).slice(0, MAX_SLOTS)
   }
 
   // Slot IDs specified
   if (Array.isArray(body.slotIds) && body.slotIds.length > 0) {
-    const slotIds = body.slotIds as SlotId[]
-    return slotIds.map((id) => {
-      const def = SLOT_DEFINITIONS.find((s) => s.id === id)!
+    const slotIds = (body.slotIds as SlotId[]).slice(0, MAX_SLOTS)
+    return slotIds.flatMap((id) => {
+      const def = SLOT_DEFINITIONS.find((s) => s.id === id)
+      if (!def) return []  // skip unknown slot IDs instead of crashing
       const strategy = analysis?.slot_strategy?.find((s) => s.slot_id === id)
       return {
         slotId: id,
@@ -152,15 +155,12 @@ export async function POST(
 
     // Proxy all product images to fal.ai storage upfront (in-process cache makes repeated calls free).
     // We rotate images across slots so each gets a different product photo for visual variety.
-    const proxiedProductImages: string[] = []
-    for (const img of productImages.slice(0, 5)) {
-      try {
-        const proxied = await proxyImageToFalStorage(img)
-        proxiedProductImages.push(proxied)
-      } catch {
-        // skip failed proxies
-      }
-    }
+    const proxyResults = await Promise.allSettled(
+      productImages.slice(0, 5).map((img) => proxyImageToFalStorage(img))
+    )
+    const proxiedProductImages = proxyResults
+      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+      .map((r) => r.value)
     const proxiedProductImageUrl = proxiedProductImages[0] ?? undefined
 
     const slots = buildSlotRequests(body, analysis)

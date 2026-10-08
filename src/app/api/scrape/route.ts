@@ -143,6 +143,9 @@ async function fetchPageContent(url: string): Promise<ScrapeResult> {
 
 async function scrapeWithFetch(url: string): Promise<string | null> {
   try {
+    // redirect: 'error' prevents SSRF via open-redirect: a public URL that
+    // 302s to 169.254.169.254 would bypass isSafeUrl() if followed silently.
+    // Cloudflare/Firecrawl handle redirecting sites; this fallback skips them.
     const res = await fetch(url, {
       headers: {
         'User-Agent':
@@ -150,7 +153,7 @@ async function scrapeWithFetch(url: string): Promise<string | null> {
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
-      redirect: 'follow',
+      redirect: 'error',
     })
 
     if (!res.ok) return null
