@@ -154,6 +154,8 @@ async function scrapeWithFetch(url: string): Promise<string | null> {
     })
 
     if (!res.ok) return null
+    const contentLength = Number(res.headers.get('content-length') ?? 0)
+    if (contentLength > 5_000_000) return null
     return res.text()
   } catch {
     return null

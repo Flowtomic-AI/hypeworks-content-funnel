@@ -282,7 +282,10 @@ export async function POST(
           .from('generated-images')
           .upload(storagePath, finalPng, { contentType: 'image/png' })
 
-        if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`)
+        if (uploadError) {
+          console.error(`Storage upload failed for slot ${slot.slotId}:`, uploadError.message)
+          throw new Error('Storage upload failed')
+        }
 
         const { data: { publicUrl } } = admin.storage
           .from('generated-images')
@@ -311,7 +314,10 @@ export async function POST(
             status: 'complete',
           })
 
-        if (insertError) throw new Error(`DB insert failed: ${insertError.message}`)
+        if (insertError) {
+          console.error(`DB insert failed for slot ${slot.slotId}:`, insertError.message)
+          throw new Error('DB insert failed')
+        }
 
         return {
           slotId: slot.slotId,
