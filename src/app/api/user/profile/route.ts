@@ -18,7 +18,8 @@ export async function GET() {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error(`Profile fetch failed for user ${user.id}:`, error.message)
+    return NextResponse.json({ error: 'Failed to load profile' }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -50,7 +51,8 @@ export async function PUT(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error(`Profile update failed for user ${user.id}:`, error.message)
+    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
   }
 
   return NextResponse.json(data)

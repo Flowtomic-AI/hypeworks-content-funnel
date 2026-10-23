@@ -22,6 +22,13 @@ export async function POST(request: Request) {
     )
   }
 
+  const VALID_PRICE_IDS = new Set(
+    [process.env.STRIPE_PRO_PRICE_ID, process.env.STRIPE_AGENCY_PRICE_ID].filter(Boolean)
+  )
+  if (!VALID_PRICE_IDS.has(priceId)) {
+    return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+  }
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('stripe_customer_id')
