@@ -42,6 +42,11 @@ export async function POST(
       )
     }
 
+    const contentLength = Number(response.headers.get('content-length') ?? 0)
+    if (contentLength > 5_000_000) {
+      return NextResponse.json({ error: 'Response too large' }, { status: 400 })
+    }
+
     const html = await response.text()
 
     const scrapedData: Record<string, unknown> = {
