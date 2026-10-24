@@ -39,6 +39,7 @@ export function isSafeUrl(rawUrl: string): boolean {
 function isSafeIPv4(a: number, b: number): boolean {
   if (a === 0) return false               // 0.0.0.0/8
   if (a === 10) return false              // 10.0.0.0/8
+  if (a === 100 && b >= 64 && b <= 127) return false // 100.64.0.0/10 (CGNAT)
   if (a === 127) return false             // 127.0.0.0/8 (loopback)
   if (a === 169 && b === 254) return false // 169.254.0.0/16 (link-local / metadata)
   if (a === 172 && b >= 16 && b <= 31) return false // 172.16.0.0/12

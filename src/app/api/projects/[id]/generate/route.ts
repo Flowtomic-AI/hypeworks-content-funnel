@@ -30,7 +30,7 @@ function buildSlotRequests(
 ): SlotRequest[] {
   // New API: explicit slots array
   if (Array.isArray(body.slots) && body.slots.length > 0) {
-    return body.slots as SlotRequest[]
+    return (body.slots as SlotRequest[]).slice(0, SLOT_DEFINITIONS.length)
   }
 
   // Slot IDs specified
