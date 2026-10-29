@@ -47,9 +47,38 @@ function isSafeIPv4(a: number, b: number): boolean {
   return true
 }
 
+/**
+ * Fetch wrapper that validates redirect targets with isSafeUrl to prevent
+ * redirect-based SSRF (a public domain could redirect to 169.254.169.254).
+ * Follows at most one redirect. Throws on network error like a normal fetch.
+ */
+export async function safeFetch(
+  url: string,
+  init?: RequestInit
+): Promise<Response> {
+  const res = await fetch(url, { ...init, redirect: 'manual' })
+
+  if (res.status >= 300 && res.status < 400) {
+    const location = res.headers.get('location')
+    if (!location) {
+      throw new TypeError('Redirect with no Location header')
+    }
+    // Resolve relative redirects against the original URL
+    const absolute = new URL(location, url).toString()
+    if (!isSafeUrl(absolute)) {
+      throw new TypeError(`Redirect target blocked by SSRF guard: ${absolute}`)
+    }
+    // Follow once, no further redirects
+    return fetch(absolute, { ...init, redirect: 'error' })
+  }
+
+  return res
+}
+
 function isSafeIPv6(host: string): boolean {
   if (host === '::1') return false                     // loopback
-  if (host.startsWith('fe80:')) return false           // link-local fe80::/10
+  // fe80::/10 covers fe80:: through febf:: (bits: 1111111010xxxxxx...)
+  if (/^fe[89ab]/i.test(host)) return false            // link-local fe80::/10
   if (host.startsWith('fc') || host.startsWith('fd')) return false // ULA fc00::/7
 
   // IPv4-mapped ::ffff:a.b.c.d
