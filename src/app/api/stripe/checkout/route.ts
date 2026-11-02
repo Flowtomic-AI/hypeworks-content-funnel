@@ -22,6 +22,23 @@ export async function POST(request: Request) {
     )
   }
 
+  // Validate against known configured prices to prevent arbitrary price ID injection
+  const validPriceIds = [
+    process.env.STRIPE_PRO_PRICE_ID,
+    process.env.STRIPE_AGENCY_PRICE_ID,
+  ].filter(Boolean) as string[]
+
+  if (validPriceIds.length === 0) {
+    return NextResponse.json(
+      { error: 'Server configuration error: no price IDs configured' },
+      { status: 500 }
+    )
+  }
+
+  if (!validPriceIds.includes(priceId)) {
+    return NextResponse.json({ error: 'Invalid price ID' }, { status: 400 })
+  }
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('stripe_customer_id')
