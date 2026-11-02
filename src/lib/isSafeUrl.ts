@@ -2,7 +2,7 @@
  * SSRF guard: returns true only for public, routable URLs.
  *
  * Blocks non-http/https schemes, private IPv4 ranges (RFC 1918, loopback,
- * link-local 169.254), multicast, all IPv6 private/loopback/link-local/ULA
+ * link-local 169.254), multicast, all IPv6 private/loopback/link-local (fe80::/10)/ULA
  * ranges, IPv4-mapped IPv6 addresses that resolve to private IPs, and
  * special hostnames (localhost, *.local, *.internal).
  */
@@ -49,7 +49,7 @@ function isSafeIPv4(a: number, b: number): boolean {
 
 function isSafeIPv6(host: string): boolean {
   if (host === '::1') return false                     // loopback
-  if (host.startsWith('fe80:')) return false           // link-local fe80::/10
+  if (/^fe[89ab]/i.test(host)) return false           // link-local fe80::/10 (fe80–febf)
   if (host.startsWith('fc') || host.startsWith('fd')) return false // ULA fc00::/7
 
   // IPv4-mapped ::ffff:a.b.c.d
