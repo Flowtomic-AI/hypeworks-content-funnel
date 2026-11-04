@@ -35,6 +35,11 @@ export async function POST(
       },
     })
 
+    // Validate final URL after following redirects to block redirect-based SSRF
+    if (!isSafeUrl(response.url)) {
+      return NextResponse.json({ error: 'Invalid or disallowed URL' }, { status: 400 })
+    }
+
     if (!response.ok) {
       return NextResponse.json(
         { error: 'Failed to fetch URL' },

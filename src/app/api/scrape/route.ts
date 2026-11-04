@@ -153,6 +153,8 @@ async function scrapeWithFetch(url: string): Promise<string | null> {
       redirect: 'follow',
     })
 
+    // Validate the final URL after following redirects to block redirect-based SSRF
+    if (!isSafeUrl(res.url)) return null
     if (!res.ok) return null
     return res.text()
   } catch {
