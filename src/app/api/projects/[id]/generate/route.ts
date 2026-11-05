@@ -22,38 +22,80 @@ interface SlotRequest {
   copyBrief?: string
 }
 
+// ─── Slot validation helpers ─────────────────────────────────────────────────
+
+const VALID_SLOT_IDS = new Set(SLOT_DEFINITIONS.map((s) => s.id))
+const VALID_FORMATS = new Set(Object.keys(IMAGE_FORMATS))
+const MAX_SLOTS = SLOT_DEFINITIONS.length
+
+function sanitizeString(value: unknown, maxLen: number): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim().substring(0, maxLen)
+  return trimmed || undefined
+}
+
+function validateSlotRequest(raw: unknown): SlotRequest | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const slotId = r.slotId as string
+  const format = r.format as string
+  if (!VALID_SLOT_IDS.has(slotId as SlotId)) return null
+  if (!VALID_FORMATS.has(format as ImageFormatType)) return null
+  const def = SLOT_DEFINITIONS.find((s) => s.id === slotId)!
+  return {
+    slotId: slotId as SlotId,
+    format: format as ImageFormatType,
+    intent: def.intent,
+    headline: sanitizeString(r.headline, 200),
+    subheadline: sanitizeString(r.subheadline, 300),
+    copyBrief: sanitizeString(r.copyBrief, 500),
+  }
+}
+
 // ─── Build slot requests from body ──────────────────────────────────────────
 
 function buildSlotRequests(
   body: Record<string, unknown>,
   analysis: StrategyAnalysis | null
 ): SlotRequest[] {
-  // New API: explicit slots array
+  // New API: explicit slots array — validate every entry against known slot IDs and formats
   if (Array.isArray(body.slots) && body.slots.length > 0) {
-    return body.slots as SlotRequest[]
+    const validated = body.slots
+      .slice(0, MAX_SLOTS)
+      .map(validateSlotRequest)
+      .filter((s): s is SlotRequest => s !== null)
+    if (validated.length > 0) return validated
   }
 
-  // Slot IDs specified
+  // Slot IDs specified — filter to known IDs only (drop unknowns instead of crashing)
   if (Array.isArray(body.slotIds) && body.slotIds.length > 0) {
-    const slotIds = body.slotIds as SlotId[]
-    return slotIds.map((id) => {
-      const def = SLOT_DEFINITIONS.find((s) => s.id === id)!
-      const strategy = analysis?.slot_strategy?.find((s) => s.slot_id === id)
-      return {
-        slotId: id,
-        format: def.format,
-        intent: def.intent,
-        headline: strategy?.headline,
-        subheadline: strategy?.subheadline,
-        copyBrief: strategy?.copy_brief ?? def.defaultBrief,
-      }
-    })
+    const slotIds = (body.slotIds as unknown[])
+      .map(String)
+      .filter((id) => VALID_SLOT_IDS.has(id as SlotId))
+      .slice(0, MAX_SLOTS) as SlotId[]
+    if (slotIds.length > 0) {
+      return slotIds.map((id) => {
+        const def = SLOT_DEFINITIONS.find((s) => s.id === id)!
+        const strategy = analysis?.slot_strategy?.find((s) => s.slot_id === id)
+        return {
+          slotId: id,
+          format: def.format,
+          intent: def.intent,
+          headline: strategy?.headline,
+          subheadline: strategy?.subheadline,
+          copyBrief: strategy?.copy_brief ?? def.defaultBrief,
+        }
+      })
+    }
   }
 
-  // Legacy: formats array — map to default slots
+  // Legacy: formats array — map to default slots (filter to known formats only)
   if (Array.isArray(body.formats) && body.formats.length > 0) {
-    const formats = body.formats as ImageFormatType[]
-    return formats.map((format) => {
+    const formats = (body.formats as unknown[])
+      .map(String)
+      .filter((f) => VALID_FORMATS.has(f as ImageFormatType))
+      .slice(0, MAX_SLOTS) as ImageFormatType[]
+    if (formats.length > 0) return formats.map((format) => {
       const def = SLOT_DEFINITIONS.find((s) => s.format === format) ?? SLOT_DEFINITIONS[0]
       const strategy = analysis?.slot_strategy?.find((s) => s.slot_id === def.id)
       return {
