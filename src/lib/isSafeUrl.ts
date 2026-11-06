@@ -49,7 +49,8 @@ function isSafeIPv4(a: number, b: number): boolean {
 
 function isSafeIPv6(host: string): boolean {
   if (host === '::1') return false                     // loopback
-  if (host.startsWith('fe80:')) return false           // link-local fe80::/10
+  // link-local fe80::/10 covers fe80:: through febf:: (first 10 bits: 1111 1110 10)
+  if (host.startsWith('fe') && '89ab'.includes(host[2])) return false
   if (host.startsWith('fc') || host.startsWith('fd')) return false // ULA fc00::/7
 
   // IPv4-mapped ::ffff:a.b.c.d
