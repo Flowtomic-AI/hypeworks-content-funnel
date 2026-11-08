@@ -22,6 +22,25 @@ export async function POST(request: Request) {
     )
   }
 
+  const VALID_PRICE_IDS = [
+    process.env.STRIPE_PRO_PRICE_ID,
+    process.env.STRIPE_AGENCY_PRICE_ID,
+  ].filter(Boolean)
+
+  if (VALID_PRICE_IDS.length === 0) {
+    return NextResponse.json(
+      { error: 'Server configuration error: no valid price IDs configured' },
+      { status: 500 }
+    )
+  }
+
+  if (!VALID_PRICE_IDS.includes(priceId)) {
+    return NextResponse.json(
+      { error: 'Invalid price ID' },
+      { status: 400 }
+    )
+  }
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('stripe_customer_id')

@@ -22,32 +22,59 @@ interface SlotRequest {
   copyBrief?: string
 }
 
+const MAX_SLOTS = SLOT_DEFINITIONS.length
+const VALID_SLOT_IDS = new Set(SLOT_DEFINITIONS.map((s) => s.id))
+const VALID_FORMATS = new Set(SLOT_DEFINITIONS.map((s) => s.format))
+
+function validateSlotRequest(raw: unknown): SlotRequest | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (!VALID_SLOT_IDS.has(r.slotId as SlotId) || !VALID_FORMATS.has(r.format as ImageFormatType)) return null
+  const def = SLOT_DEFINITIONS.find((s) => s.id === r.slotId)!
+  return {
+    slotId: r.slotId as SlotId,
+    format: r.format as ImageFormatType,
+    intent: (r.intent as ImageIntent) ?? def.intent,
+    headline: typeof r.headline === 'string' ? r.headline.slice(0, 200) : undefined,
+    subheadline: typeof r.subheadline === 'string' ? r.subheadline.slice(0, 300) : undefined,
+    copyBrief: typeof r.copyBrief === 'string' ? r.copyBrief.slice(0, 500) : undefined,
+  }
+}
+
 // ─── Build slot requests from body ──────────────────────────────────────────
 
 function buildSlotRequests(
   body: Record<string, unknown>,
   analysis: StrategyAnalysis | null
 ): SlotRequest[] {
-  // New API: explicit slots array
+  // New API: explicit slots array — validate and sanitize each entry
   if (Array.isArray(body.slots) && body.slots.length > 0) {
-    return body.slots as SlotRequest[]
+    const validated = body.slots
+      .slice(0, MAX_SLOTS)
+      .map(validateSlotRequest)
+      .filter((s): s is SlotRequest => s !== null)
+    if (validated.length > 0) return validated
   }
 
-  // Slot IDs specified
+  // Slot IDs specified — filter unknown IDs gracefully
   if (Array.isArray(body.slotIds) && body.slotIds.length > 0) {
-    const slotIds = body.slotIds as SlotId[]
-    return slotIds.map((id) => {
-      const def = SLOT_DEFINITIONS.find((s) => s.id === id)!
-      const strategy = analysis?.slot_strategy?.find((s) => s.slot_id === id)
-      return {
-        slotId: id,
-        format: def.format,
-        intent: def.intent,
-        headline: strategy?.headline,
-        subheadline: strategy?.subheadline,
-        copyBrief: strategy?.copy_brief ?? def.defaultBrief,
-      }
-    })
+    const slotIds = (body.slotIds as unknown[])
+      .filter((id): id is SlotId => VALID_SLOT_IDS.has(id as SlotId))
+      .slice(0, MAX_SLOTS)
+    if (slotIds.length > 0) {
+      return slotIds.map((id) => {
+        const def = SLOT_DEFINITIONS.find((s) => s.id === id)!
+        const strategy = analysis?.slot_strategy?.find((s) => s.slot_id === id)
+        return {
+          slotId: id,
+          format: def.format,
+          intent: def.intent,
+          headline: strategy?.headline,
+          subheadline: strategy?.subheadline,
+          copyBrief: strategy?.copy_brief ?? def.defaultBrief,
+        }
+      })
+    }
   }
 
   // Legacy: formats array — map to default slots
