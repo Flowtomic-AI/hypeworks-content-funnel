@@ -72,3 +72,32 @@ function isSafeIPv6(host: string): boolean {
 
   return true
 }
+
+/**
+ * fetch wrapper that follows HTTP redirects only to safe (public) URLs.
+ * Prevents SSRF bypass where a public URL redirects to a private address.
+ * Use this instead of fetch() for any user-supplied URLs.
+ */
+export async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
+  const MAX_REDIRECTS = 10
+  let currentUrl = url
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!isSafeUrl(currentUrl)) {
+      throw new Error(`Redirect to disallowed URL: ${currentUrl}`)
+    }
+
+    const res = await fetch(currentUrl, { ...options, redirect: 'manual' })
+
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location')
+      if (!location) return res
+      currentUrl = new URL(location, currentUrl).toString()
+      continue
+    }
+
+    return res
+  }
+
+  throw new Error('Too many redirects')
+}
