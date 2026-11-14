@@ -72,3 +72,26 @@ function isSafeIPv6(host: string): boolean {
 
   return true
 }
+
+/**
+ * fetch() wrapper that validates every redirect hop with isSafeUrl().
+ *
+ * Without this, a server can redirect our SSRF-checked request to an internal
+ * address (e.g. 169.254.169.254) and bypass the guard. Up to 5 hops are
+ * followed; each Location header is checked before following.
+ */
+export async function safeFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  let currentUrl = url
+  for (let hop = 0; hop < 5; hop++) {
+    const res = await fetch(currentUrl, { ...options, redirect: 'manual' })
+    if (res.status < 300 || res.status >= 400) return res
+    const location = res.headers.get('Location')
+    if (!location) return res
+    const nextUrl = new URL(location, currentUrl).href
+    if (!isSafeUrl(nextUrl)) {
+      throw new Error(`Redirect to disallowed URL blocked: ${nextUrl}`)
+    }
+    currentUrl = nextUrl
+  }
+  throw new Error('Too many redirects')
+}
