@@ -163,7 +163,9 @@ export async function POST(
     }
     const proxiedProductImageUrl = proxiedProductImages[0] ?? undefined
 
-    const slots = buildSlotRequests(body, analysis)
+    const rawSlots = buildSlotRequests(body, analysis)
+    // Cap to avoid resource exhaustion; no legitimate request exceeds one slot per defined slot
+    const slots = rawSlots.slice(0, SLOT_DEFINITIONS.length)
     const slotCount = slots.length
 
     if (
@@ -181,6 +183,7 @@ export async function POST(
       .from('projects')
       .update({ status: 'generating' })
       .eq('id', projectId)
+      .eq('user_id', user.id)
 
     // ── Run all slots in parallel ───────────────────────────────────────────
     const settled = await Promise.allSettled(
@@ -365,6 +368,7 @@ export async function POST(
       .from('projects')
       .update({ status: 'complete' })
       .eq('id', projectId)
+      .eq('user_id', user.id)
 
     if (results.every((r) => r.status === 'failed')) {
       const firstError = results[0]?.error ?? 'All slots failed to generate'

@@ -42,6 +42,15 @@ export async function PUT(request: Request) {
     if (field in body) updates[field] = body[field]
   }
 
+  if ('avatar_url' in updates && updates.avatar_url != null) {
+    try {
+      const parsed = new URL(updates.avatar_url as string)
+      if (parsed.protocol !== 'https:') throw new Error()
+    } catch {
+      return NextResponse.json({ error: 'avatar_url must be a valid HTTPS URL' }, { status: 400 })
+    }
+  }
+
   const { data, error } = await supabase
     .from('profiles')
     .update(updates)

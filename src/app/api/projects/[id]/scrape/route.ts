@@ -35,6 +35,11 @@ export async function POST(
       },
     })
 
+    // Guard against redirect chains that land on private/internal addresses
+    if (!isSafeUrl(response.url)) {
+      return NextResponse.json({ error: 'Invalid or disallowed URL' }, { status: 400 })
+    }
+
     if (!response.ok) {
       return NextResponse.json(
         { error: 'Failed to fetch URL' },

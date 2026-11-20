@@ -153,6 +153,9 @@ async function scrapeWithFetch(url: string): Promise<string | null> {
       redirect: 'follow',
     })
 
+    // Guard against redirect chains that land on private/internal addresses
+    if (!isSafeUrl(res.url)) return null
+
     if (!res.ok) return null
     return res.text()
   } catch {
@@ -388,6 +391,7 @@ async function scrapeReviews(asin: string): Promise<string[]> {
 
   try {
     const reviewUrl = `https://www.amazon.com/product-reviews/${asin}?sortBy=recent&pageNumber=1`
+    if (!isSafeUrl(reviewUrl)) return []
     const result = await fetchPageContent(reviewUrl)
     if (!result.markdown) return []
 

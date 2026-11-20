@@ -1,4 +1,5 @@
 import { fal } from '@fal-ai/client'
+import { isSafeUrl } from '@/lib/isSafeUrl'
 
 // In-process URL cache: avoid re-uploading the same source image within a request batch.
 // Capped at 200 entries to prevent unbounded growth in long-lived serverless instances.
@@ -39,6 +40,11 @@ export async function proxyImageToFalStorage(sourceUrl: string): Promise<string>
   // Return cached result to avoid duplicate uploads in the same generation batch
   const cached = proxyCache.get(sourceUrl)
   if (cached) return cached
+
+  // SSRF guard: image URLs come from scraped_data which a user can overwrite via the API
+  if (!isSafeUrl(sourceUrl)) {
+    throw new Error(`Blocked unsafe image URL: ${sourceUrl}`)
+  }
 
   // Fetch image server-side, spoofing a browser user-agent to bypass Amazon CDN guards
   const response = await fetch(sourceUrl, {
